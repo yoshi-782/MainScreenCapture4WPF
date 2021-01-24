@@ -1,0 +1,203 @@
+﻿<Window x:Class="MainScreenCapture4WPF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MainScreenCapture4WPF"
+        mc:Ignorable="d"
+        Title="画面撮るやつ" Height="479" Width="570" ResizeMode="CanMinimize" Closing="Window_Closing">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="550" />
+            <ColumnDefinition Width="420" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50" />
+            <RowDefinition Height="50" />
+            <RowDefinition Height="310" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Top">
+            <Button Name="capButton"
+                    Content="撮影"
+                    Margin="10,10,10,0"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Width="100"
+                    Cursor="Hand"
+                    Click="CapButton_Click">
+            </Button>
+
+            <Button Name="copyButton"
+                    Content="画像をコピー"
+                    Margin="0,10,10,0"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Width="100"
+                    Cursor="Hand"
+                    Click="copyButton_Click">
+            </Button>
+            <TextBlock Text="最前面　"
+                       FontSize="24"
+                       Margin="0,0,10,0"
+                       VerticalAlignment="Center"/>
+            <ToggleButton Name="topMastCheckButton"
+                          Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+            <TextBlock Text="画像をファイルとして&#xa;コピーする"
+                       Width="130"
+                       TextAlignment="Left"
+                       VerticalAlignment="Center"
+                       Margin="10,0,0,0"
+                       FontSize="14"
+                       Style="{StaticResource MaterialDesignBody1TextBlock}"/>
+            <ToggleButton Name="fileCopyCheckButton"
+                          Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" 
+                    Grid.Column="0" 
+                    Orientation="Horizontal">
+            <Button Name="saveButton"
+                    Content="保存"
+                    Margin="10,0,10,0"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Width="100"
+                    Cursor="Hand"
+                    Click="SaveButton_Click">
+
+            </Button>
+            <Button Name="previewButton"
+                    Content="プレビュー"
+                    Margin="0,0,10,0"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Width="100"
+                    Cursor="Hand"
+                    Click="PreviewButton_Click">
+
+            </Button>
+            <TextBlock Text="履歴表示"
+                       FontSize="24"
+                       Margin="0,0,10,0"
+                       VerticalAlignment="Center"/>
+            <ToggleButton Name="historyShowButton"
+                          Style="{StaticResource MaterialDesignSwitchToggleButton}" 
+                          Click="ToggleButton_Click"/>
+
+            <ComboBox Name="screensName"
+                      Width="180"
+                      FontSize="20"
+                      HorizontalContentAlignment="Center"
+                      VerticalAlignment="Top"
+                      Margin="10,0,0,0"
+                      ItemsSource="{Binding screenList}"
+                      Style="{StaticResource MaterialDesignComboBox}"/>
+        </StackPanel>
+        <Image Name="capImage"
+               Grid.Row="2"
+               Grid.Column="0"
+               Width="535"
+               Height="300"
+               Stretch="Fill"
+               HorizontalAlignment="Left"
+               Margin="10,0,0,5" Grid.ColumnSpan="2">
+            <!-- Source="D:\特殊フォルダ\デスクトップ\スクリーンショット_20201018120759.png"> -->
+            <!--="D:\特殊フォルダ\デスクトップ\スクリーンショット_20201018120759.png">-->
+
+        </Image>
+        
+        <!-- 履歴項目 -->
+        <TextBlock Text="履　歴"
+                   Grid.Column="1"
+                   Grid.Row="0"
+                   FontSize="24"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center">
+
+        </TextBlock>
+        <ListBox Name="historyList"
+                 Grid.Row="1"
+                 Grid.Column="1"
+                 Grid.RowSpan="2"
+                 ScrollViewer.VerticalScrollBarVisibility="Visible" HorizontalAlignment="Left" Width="400">
+            <ListBox.ItemContainerStyle>
+                <!-- トリガーでフォーカスをListBoxへ紐付ける -->
+                <Style TargetType="ListBoxItem">
+                    <Style.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter Property="IsSelected" Value="True" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="200"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="60"/>
+                            <RowDefinition Height="60"/>
+                        </Grid.RowDefinitions>
+                        <Image Name="historyImg"
+                               Grid.Column="0"
+                               Grid.RowSpan="2"
+                               Source="{Binding HistoryImage}">
+                        </Image>
+                        <StackPanel Grid.Column="1"
+                                    Grid.Row="0"
+                                    Orientation="Horizontal">
+
+                            <Button Name="historyImgCopyButton"
+                                Content="コピー"
+                                Margin="10,10,10,0"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Width="80"
+                                FontSize="12"
+                                Cursor="Hand"
+                                Click="HistoryImgCopyButton_Click">
+                            </Button>
+                            <Button Name="historyImgSaveButton"
+                                Content="保存"
+                                Margin="10,10,10,0"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Width="80"
+                                FontSize="12"
+                                Cursor="Hand"
+                                Click="HistoryImgSaveButton_Click">
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Grid.Row="1"
+                                    Grid.Column="1">
+                            <Button Name="historyImgPreview"
+                                Content="プレビュー"
+                                Margin="10,0,10,0"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Width="80"
+                                FontSize="12"
+                                Cursor="Hand"
+                                Click="HistoryImgPreview_Click">
+                            </Button>
+                            <Button Name="historyImgDelete"
+                                Content="削除"
+                                Margin="10,0,10,0"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Width="80"
+                                FontSize="12"
+                                Cursor="Hand"
+                                Click="HistoryImgDelete_Click">
+                            </Button>
+                        </StackPanel>
+
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <StatusBar Name="status"
+                   Grid.Row="3"
+                   Grid.ColumnSpan="2" 
+                   Margin="0,0,-15,0">
+            <TextBlock Name="statusText"
+                       FontSize="18"/>
+        </StatusBar>
+    </Grid>
+</Window>
