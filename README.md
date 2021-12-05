@@ -7,7 +7,7 @@
 また、スクリーンショットの履歴を表示することができる
 
 ## 環境
-* Visual Studio 2019 C# WPF .NET Core 3.1
+* Visual Studio 2022 C# WPF .NET 6
 * MaterialDesignThemes
 * System.Drawing.Common
 
