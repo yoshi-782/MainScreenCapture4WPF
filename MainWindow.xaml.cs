@@ -1,14 +1,9 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Drawing;
-using System.IO;
-using System.Windows.Threading;
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace MainScreenCapture4WPF
 {
@@ -17,11 +12,6 @@ namespace MainScreenCapture4WPF
     /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// 保存するか
-        /// </summary>
-        private bool isSave = false;
-
         /// <summary>
         /// キャプチャ履歴のバインド用クラス
         /// </summary>
@@ -33,7 +23,7 @@ namespace MainScreenCapture4WPF
         /// <summary>
         /// キャプチャ履歴用バインドデータ
         /// </summary>
-        private readonly ObservableCollection<HistoryImageList> historyImgList = new ObservableCollection<HistoryImageList>();
+        private readonly ObservableCollection<HistoryImageList> historyImgList = new();
 
         /// <summary>
         /// モニター一覧のバインドデータ
@@ -41,19 +31,9 @@ namespace MainScreenCapture4WPF
         private ObservableCollection<string> screenList;
 
         /// <summary>
-        /// テンポラリファイルのパス
+        /// キャプチャーAPI
         /// </summary>
-        private readonly string tmpPath = Path.GetTempPath() + "プレビュー.bmp";
-
-        /// <summary>
-        /// コピー用パス
-        /// </summary>
-        private string fileCopyPath = "";
-
-        /// <summary>
-        /// モニター情報クラス
-        /// </summary>
-        private MonitorInfo monitorInfo;
+        private readonly CaptureAPI.CapAPI capAPI = new();
 
         /// <summary>
         /// コンストラクタ
@@ -61,20 +41,26 @@ namespace MainScreenCapture4WPF
         public MainWindow()
         {
             InitializeComponent();
-
+            
             // 初回画面表示時処理
             this.ContentRendered += (s, e) =>
             {
+                // 画面を最前面にするかのイベント処理
                 topMastCheckButton.Click += (s, e) => this.Topmost = (bool)topMastCheckButton.IsChecked;
+                // キャプチャ画像の履歴
                 this.historyList.ItemsSource = historyImgList;
-                
-                monitorInfo = new MonitorInfo();
-                screenList = new ObservableCollection<string>(monitorInfo.monitorsName.Keys);
-                screenList.Insert(0, "モニターを選択");
+                screenList = new ObservableCollection<string>(capAPI.MonitorsName);
+                //screenList.Insert(0, "モニターを選択");
                 this.screensName.ItemsSource = screenList;
                 screensName.SelectedIndex = 0;
             };
         }
+
+        /// <summary>
+        /// ウィンドウのサイズ・位置をRectangleに変換
+        /// </summary>
+        /// <returns>ウィンドウのサイズ・位置情報</returns>
+        private Rectangle GetRectangle() => new((int)this.Left, (int)this.Top, (int)this.Width, (int)this.Height);
 
         /// <summary>
         /// キャプチャボタン
@@ -83,43 +69,49 @@ namespace MainScreenCapture4WPF
         /// <param name="e"></param>
         private void CapButton_Click(object sender, RoutedEventArgs e)
         {
-            if (screensName.SelectedItem.ToString() == "モニターを選択")
+            //if (screensName.SelectedItem.ToString() == "モニターを選択")
+            //{
+            //    MessageBox.Show("撮影する画面を選択してください。",
+            //                    this.Title,
+            //                    MessageBoxButton.OK,
+            //                    MessageBoxImage.Warning);
+            //    return;
+            //}
+
+            //if (!monitorInfo.GetScreenSize(screensName.SelectedItem?.ToString()))
+            //{
+            //    MessageBox.Show("指定したモニターが存在しません。", 
+            //                    this.Title, 
+            //                    MessageBoxButton.OK, 
+            //                    MessageBoxImage.Error);
+            //    statusText.Text = "画面の撮影に失敗しました。";
+            //    return;
+            //}
+
+            // モニターのサイズ取得
+            if (capAPI.GetScreenRect(screensName.SelectedItem.ToString(), out Rectangle rect) == false)
             {
-                MessageBox.Show("撮影する画面を選択してください。",
+                MessageBox.Show("指定したモニターが存在しません。",
                                 this.Title,
                                 MessageBoxButton.OK,
-                                MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!monitorInfo.GetScreenSize(screensName.SelectedItem?.ToString()))
-            {
-                MessageBox.Show("指定したモニターが存在しません。", 
-                                this.Title, 
-                                MessageBoxButton.OK, 
                                 MessageBoxImage.Error);
-                statusText.Text = "画面の撮影に失敗しました。";
                 return;
             }
 
             var text = $"画面を撮影しました。{((bool)fileCopyCheckButton.IsChecked ? " 画像ファイルコピー済み" : " 画像データコピー済み")}";
-            var bmp = new Bitmap(monitorInfo.Width, monitorInfo.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            var g = Graphics.FromImage(bmp);
-            if (IsDisplayRangeIn())
+            BitmapSource image = null;
+            
+
+            if (capAPI.IsDisplayRangeIn(rect, GetRectangle()))
             {
-                // 400ミリ秒非表示、その間スクショする
                 this.Hide();
-                DispatcherTimer timer = new DispatcherTimer();
+                DispatcherTimer timer = new();
                 timer.Interval = new TimeSpan(0, 0, 0, 0, 400);
                 void timerEvent(object s, EventArgs ev)
                 {
-                    g.CopyFromScreen(monitorInfo.UpperLeftSource, new System.Drawing.Point(0, 0), bmp.Size);
-                    var image = Imaging.CreateBitmapSourceFromHBitmap(bmp.GetHbitmap(),
-                                                                    IntPtr.Zero,
-                                                                    Int32Rect.Empty,
-                                                                    BitmapSizeOptions.FromEmptyOptions());
-                    image.Freeze();
-                    g.Dispose();
+                    image = capAPI.Capture(rect);
+                    timer.Stop();
+                    timer.Tick -= timerEvent;
 
                     if (capImage.Source == null)
                     {
@@ -131,28 +123,19 @@ namespace MainScreenCapture4WPF
                         historyImgList.Insert(0, new HistoryImageList { HistoryImage = (BitmapSource)capImage.Source });
                         capImage.Source = image;
                     }
-                    
-                    PicCopy(image);
-                    isSave = false;
+
+                    capAPI.PicCopy(image, (bool)fileCopyCheckButton.IsChecked);
                     statusText.Text = text;
-                    
+
                     this.Show();
-                    timer.Stop();
-                    timer.Tick -= timerEvent;
-                };
+                }
 
                 timer.Tick += timerEvent;
                 timer.Start();
             }
             else
             {
-                g.CopyFromScreen(monitorInfo.UpperLeftSource, new System.Drawing.Point(0, 0), bmp.Size);
-                var image = Imaging.CreateBitmapSourceFromHBitmap(bmp.GetHbitmap(),
-                                                                IntPtr.Zero,
-                                                                Int32Rect.Empty,
-                                                                BitmapSizeOptions.FromEmptyOptions());
-                image.Freeze();
-                g.Dispose();
+                image = capAPI.Capture(rect);
 
                 if (capImage.Source == null)
                 {
@@ -161,16 +144,13 @@ namespace MainScreenCapture4WPF
                 }
                 else
                 {
-                    // 履歴挿入
+                    // 履歴に挿入
                     historyImgList.Insert(0, new HistoryImageList { HistoryImage = (BitmapSource)capImage.Source });
                     capImage.Source = image;
                 }
 
-                PicCopy(image);
-                isSave = false;
+                capAPI.PicCopy(image, (bool)fileCopyCheckButton.IsChecked);
                 statusText.Text = text;
-
-                
             }
         }
 
@@ -179,11 +159,11 @@ namespace MainScreenCapture4WPF
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void copyButton_Click(object sender, RoutedEventArgs e)
+        private void CopyButton_Click(object sender, RoutedEventArgs e)
         {
             if (capImage.Source != null)
             {
-                PicCopy((BitmapSource)capImage.Source);
+                capAPI.PicCopy((BitmapSource)capImage.Source, (bool)fileCopyCheckButton.IsChecked);
                 statusText.Text = (bool)fileCopyCheckButton.IsChecked ? "画像をファイルとしてコピーしました。" : "画像データをコピーしました。";
             }
         }
@@ -198,11 +178,11 @@ namespace MainScreenCapture4WPF
             if (capImage.Source == null)
                 return;
 
-            if (isSave)
-            {
-                statusText.Text = "既に保存済みです。";
-                return;
-            }
+            //if (capAPI.IsSave)
+            //{
+            //    statusText.Text = "既に保存済みです。";
+            //    return;
+            //}
 
             SavePicture((BitmapSource)capImage.Source);
         }
@@ -216,7 +196,7 @@ namespace MainScreenCapture4WPF
         {
             if (capImage.Source != null)
             {
-                PicPreview((BitmapSource)capImage.Source);
+                capAPI.PreviewPicture((BitmapSource)capImage.Source);
                 statusText.Text = "画像を開きます。";
             }
         }
@@ -238,78 +218,7 @@ namespace MainScreenCapture4WPF
         /// <param name="e"></param>
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            // テンポラリフォルダの画像削除
-            if (File.Exists(tmpPath))
-                File.Delete(tmpPath);
-
-            if (File.Exists(fileCopyPath))
-                File.Delete(fileCopyPath);
-        }
-
-        /// <summary>
-        /// スクリーンショットの範囲内に自身のアプリが存在するか
-        /// </summary>
-        /// <returns>範囲内/範囲外</returns>
-        private bool IsDisplayRangeIn()
-        {
-            var leftTop_leftSide = monitorInfo.UpperLeftSource.X <= this.Left && monitorInfo.UpperLeftSource.Y <= this.Top;
-            var leftTop_rightSide = monitorInfo.UpperLeftDestination.X >= this.Left && monitorInfo.UpperLeftDestination.Y >= this.Top;
-            var rightDown_leftSide = monitorInfo.UpperLeftSource.X <= (this.Left + this.Width) && monitorInfo.UpperLeftSource.Y <= (this.Top + this.Height);
-            var rightDown_rightSide = monitorInfo.UpperLeftDestination.X >= (this.Left + this.Width) && monitorInfo.UpperLeftDestination.Y >= (this.Top + this.Height);
-
-            // 左上の位置と右下の位置が画面の範囲内にあるかチェック
-            return (leftTop_leftSide && leftTop_rightSide) || (rightDown_leftSide && rightDown_rightSide);
-        }
-
-        /// <summary>
-        /// 画像をクリップボードに保存
-        /// </summary>
-        private void PicCopy(BitmapSource bitmap)
-        {
-            if ((bool)fileCopyCheckButton.IsChecked)
-            {
-                UpdateFileCopyPath();
-
-                // ファイルとしてコピー
-                using (FileStream stream = new FileStream(fileCopyPath, FileMode.Create))
-                {
-                    // テンポラリフォルダに保存
-                    PngBitmapEncoder encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                    encoder.Save(stream);
-                }
-
-                var files = new StringCollection();
-                files.Add(fileCopyPath);
-                Clipboard.SetFileDropList(files);
-            }
-            else
-            {
-                // データとしてコピー
-                Clipboard.SetImage(bitmap);
-            }
-        }
-
-        /// <summary>
-        /// 画像プレビュー(開く)
-        /// </summary>
-        /// <param name="bitmap">画像データ</param>
-        private void PicPreview(BitmapSource bitmap)
-        {
-            // テンポラリフォルダに保存
-            using (FileStream stream = new FileStream(tmpPath, FileMode.Create))
-            {
-                PngBitmapEncoder encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                encoder.Save(stream);
-            }
-
-            //　画像を開く
-            var proc = new Process();
-            proc.StartInfo.FileName = tmpPath;
-            proc.StartInfo.UseShellExecute = true;
-            proc.Start();
-            statusText.Text = "画像を開きます。";
+            capAPI.DeleteTemporaryFile();
         }
 
         /// <summary>
@@ -317,63 +226,14 @@ namespace MainScreenCapture4WPF
         /// </summary>
         private void SavePicture(BitmapSource bitmap)
         {
-            var sfd = new SaveFileDialog
+            if (capAPI.SavePicture(bitmap))
             {
-                FileName = $"スクリーンショット_{DateTime.Now:yyyyMMddhhmmss}.png",
-                Filter = "PNG ファイル(*.png)|*.png|JPG ファイル(*jpg)|*jpg|BMP ファイル(*bmp)|*bmp",
-            };
-
-            if (sfd.ShowDialog() == true)
-            {
-                using (FileStream stream = new FileStream(sfd.FileName, FileMode.Create))
-                {
-                    switch (Path.GetExtension(sfd.FileName))
-                    {
-                        case ".jpg":
-                            JpegBitmapEncoder jpgEncoder = new JpegBitmapEncoder();
-                            jpgEncoder.Frames.Add(BitmapFrame.Create(bitmap));
-                            jpgEncoder.Save(stream);
-                            break;
-
-                        case ".png":
-                            PngBitmapEncoder pngEncoder = new PngBitmapEncoder();
-                            pngEncoder.Frames.Add(BitmapFrame.Create(bitmap));
-                            pngEncoder.Save(stream);
-                            break;
-
-                        case ".bmp":
-                            BmpBitmapEncoder bmpEncoder = new BmpBitmapEncoder();
-                            bmpEncoder.Frames.Add(BitmapFrame.Create(bitmap));
-                            bmpEncoder.Save(stream);
-                            break;
-                    }
-                }
-
-                
-                isSave = true;
                 statusText.Text = "画像を保存しました。";
             }
             else
             {
                 statusText.Text = "保存を中止しました。";
             }
-        }
-
-        /// <summary>
-        /// コピー用パスのアップデート
-        /// </summary>
-        private void UpdateFileCopyPath()
-        {
-            if (fileCopyPath.Length > 0)
-            {
-                if (File.Exists(fileCopyPath))
-                {
-                    File.Delete(fileCopyPath);
-                }
-            }
-
-            // パスの作成
-            fileCopyPath = @$"{Path.GetTempPath()}スクリーンショット_{DateTime.Now:yyyyMMddhhmmss}.png";
         }
 
         /// <summary>
@@ -394,7 +254,8 @@ namespace MainScreenCapture4WPF
         private void HistoryImgPreview_Click(object sender, RoutedEventArgs e)
         {
             // テンポラリフォルダに画像を作成して表示
-            PicPreview(historyImgList[historyList.SelectedIndex].HistoryImage);
+            capAPI.PreviewPicture(historyImgList[historyList.SelectedIndex].HistoryImage);
+            statusText.Text = "画像を開きます。";
         }
 
         /// <summary>
@@ -417,7 +278,7 @@ namespace MainScreenCapture4WPF
         /// <param name="e"></param>
         private void HistoryImgCopyButton_Click(object sender, RoutedEventArgs e)
         {
-            PicCopy(historyImgList[historyList.SelectedIndex].HistoryImage);
+            capAPI.PicCopy(historyImgList[historyList.SelectedIndex].HistoryImage, (bool)fileCopyCheckButton.IsChecked);
             statusText.Text = (bool)fileCopyCheckButton.IsChecked ? "画像をファイルとしてコピーしました。" : "画像データをコピーしました。";
         }
     }

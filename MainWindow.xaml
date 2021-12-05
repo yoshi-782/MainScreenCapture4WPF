@@ -33,7 +33,7 @@
                     Style="{StaticResource MaterialDesignRaisedButton}"
                     Width="100"
                     Cursor="Hand"
-                    Click="copyButton_Click">
+                    Click="CopyButton_Click">
             </Button>
             <TextBlock Text="最前面　"
                        FontSize="24"
